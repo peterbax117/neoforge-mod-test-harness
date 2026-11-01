@@ -1,0 +1,108 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.148'
+    id 'idea'
+}
+
+version = mod_version
+group = mod_group_id
+
+base {
+    archivesName = 'neoforge-mod-test-harness'
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+// The harness tests itself with vanilla content through the same layers consumers use.
+sourceSets {
+    gametest {
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+    clienttest {
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+
+def clientTestReport = layout.buildDirectory.file('clienttest/report.txt')
+
+neoForge {
+    version = project.neo_version
+
+    parchment {
+        mappingsVersion = project.parchment_mappings_version
+        minecraftVersion = project.parchment_minecraft_version
+    }
+
+    runs {
+        gameTestServer {
+            type = 'gameTestServer'
+            sourceSet = sourceSets.gametest
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        clientTest {
+            client()
+            sourceSet = sourceSets.clienttest
+            gameDirectory = project.file('run/clienttest')
+            systemProperty 'modtestharness.clienttest.report', clientTestReport.get().asFile.absolutePath
+        }
+
+        configureEach {
+            logLevel = org.slf4j.event.Level.INFO
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
+            sourceSet(sourceSets.gametest)
+            sourceSet(sourceSets.clienttest)
+        }
+    }
+}
+
+neoForge.addModdingDependenciesTo(sourceSets.gametest)
+neoForge.addModdingDependenciesTo(sourceSets.clienttest)
+
+var generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {
+    var replaceProperties = [
+            minecraft_version_range: minecraft_version_range,
+            neo_version            : neo_version,
+            loader_version_range   : loader_version_range,
+            mod_id                 : mod_id,
+            mod_name               : mod_name,
+            mod_license            : mod_license,
+            mod_version            : mod_version,
+    ]
+    inputs.properties replaceProperties
+    expand replaceProperties
+    from 'src/main/templates'
+    into 'build/generated/sources/modMetadata'
+}
+sourceSets.main.resources.srcDir generateModMetadata
+neoForge.ideSyncTask generateModMetadata
+
+tasks.matching { it.name == 'runClientTest' }.configureEach {
+    def report = clientTestReport
+    doFirst { report.get().asFile.delete() }
+}
+
+tasks.register('clientTest') {
+    group = 'verification'
+    description = 'Runs the harness self-tests in a real client and fails unless every test passed.'
+    dependsOn 'runClientTest'
+    def report = clientTestReport
+    doLast {
+        def file = report.get().asFile
+        if(!file.exists()) throw new GradleException("Client tests wrote no report to ${file}")
+        def text = file.text
+        println text
+        if(!text.startsWith('PASS')) throw new GradleException("Client tests failed, see ${file}")
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}

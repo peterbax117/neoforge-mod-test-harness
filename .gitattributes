@@ -1,0 +1,9 @@
+# Generated files always use LF, so git does not report line-ending-only changes.
+src/generated/**/.cache/* text eol=lf
+src/generated/**/*.json text eol=lf
+
+# The Unix wrapper script must keep LF endings to run on Linux CI.
+gradlew text eol=lf
+
+# GameTest structure templates are gzipped NBT.
+*.nbt binary
