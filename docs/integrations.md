@@ -25,9 +25,9 @@ Patchouli #15, Jade #18. All-time totals favor older mods, so the pack data abov
 | Kind | Mods | What to do | Needed when |
 |---|---|---|---|
 | Recipe viewer | **JEI** | Vanilla recipe types show automatically. Custom recipe types (special or dynamic recipes) need a JEI plugin, or players cannot see them. Add info pages for mechanics that recipes do not explain. | Every mod with items |
-| Pack scripting | **KubeJS** | Mostly free: keep recipes as data files, use common `c:` tags (`c:ingots/gold`), no hard-coded recipe logic. Packs then edit or remove recipes. | Every mod |
+| Recipe editing (pack makers) | **KubeJS**, CraftTweaker | Mostly free: keep recipes as data files, use common `c:` tags (`c:ingots/gold`), no hard-coded recipe logic. Pack makers then make items harder or easier to obtain. CraftTweaker is in none of the six packs above but is still used by pack makers. Prove it with a test run that loads CraftTweaker and a sample script (see angelring-pb `-Pcrafttweaker`). | Every mod with recipes |
 | Accessory slots | **Curios** | Add the item to a slot tag (`data/curios/tags/item/<slot>.json`) and enable the slot for players (`data/<modid>/curios/entities/*.json`). The item must still work without Curios. Keep Curios code in one class loaded only when Curios is present. | Wearable items |
-| Block info overlay | **Jade** | Register a Jade plugin to show block or entity state when looked at. | Mods with blocks or machines that have state |
+| Block info overlay | **Jade** | Register a Jade plugin to show block or entity state when looked at. Jade 15.10.6 for 1.21.1 NeoForge: `maven.modrinth:jade:15.10.6+neoforge`. | Mods with blocks, machines or entities that have state; not items alone |
 | Guidebook | **Patchouli**, Modonomicon | Ship an in-game book describing mechanics. | Mods with non-obvious mechanics |
 | Backpacks and storage | **Sophisticated Backpacks**, AE2, Refined Storage, Mekanism | Use NeoForge capabilities (`Capabilities.ItemHandler.ITEM` for items) instead of special cases, so any mod exposing an item handler works. Decide explicitly whether items inside a backpack count (for example, a ring inside a backpack). | Mods that pull items from the inventory or check carried items |
 | Quests | FTB Quests | Keep item and block ids stable between versions; packs reference them. | Every mod |
@@ -41,21 +41,23 @@ are installed.
 
 1. **Standalone run (required):** no optional integrations on the classpath. This is the configuration every
    player has.
-2. **One run per integration the mod supports**, adding just that mod. Pattern: the integration as `localRuntime`
-   for development, and a Gradle property to drop it for the standalone run:
+2. **Integration runs**, adding the optional mods the mod supports. Pattern: optional mods as `localRuntime` for
+   development, and Gradle properties to choose the test setup:
 
    ```groovy
-   if(!project.hasProperty('noCurios')) {
-       dependencies {
+   def standalone = project.hasProperty('standalone')     // no optional mods
+   def crafttweaker = project.hasProperty('crafttweaker') // plus CraftTweaker and a sample script
+   dependencies {
+       if(!standalone) {
            gametestRuntimeOnly "top.theillusivec4.curios:curios-neoforge:${curios_version}"
-           clienttestRuntimeOnly "top.theillusivec4.curios:curios-neoforge:${curios_version}"
+           gametestRuntimeOnly "mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}"
        }
    }
    ```
 
-   Tests read the presence with `ModList.get().isLoaded("curios")` and keep expectations that hold in both
-   configurations. See [angelring-pb](https://github.com/peterbax117/angelring-pb) for a CI matrix
-   (`with-curios`, `without-curios`).
+   Tests read presence with `ModList.get().isLoaded("curios")` and keep expectations that hold in every setup.
+   See [angelring-pb](https://github.com/peterbax117/angelring-pb) for a CI matrix (`standalone`,
+   `integrations`, `crafttweaker`). Run integrations separately when they could interfere with each other.
 3. **Before a release, a common-pack smoke run** with the tier 1 mods that have no heavy dependencies (JEI,
    Curios, Jade, Patchouli, Sophisticated Backpacks) to catch load-order or conflict crashes.
 
@@ -63,9 +65,24 @@ Write the expected behavior as a table before coding: integration present or abs
 feature can be used. Confirm every "does not work" cell with the owner; never encode an unconfirmed negative
 behavior in a test.
 
+## Deciding per mod
+
+Not every integration applies to every mod. For each mod, write a table of integrations with "applies or not" and
+the exact behavior, and confirm it with the owner before coding. Angel Ring (confirmed 2026-11-01):
+
+| Integration | Applies | Behavior |
+|---|---|---|
+| JEI | Yes | Information page: what the ring does, where it works, double-tap jump |
+| Curios | Yes | Ring slot is one more place to wear it |
+| CraftTweaker, KubeJS | Yes | Pack makers can replace or remove the recipe |
+| Backpacks, bundles, shulker boxes | No | A ring stored inside one does not grant flight |
+| Jade | No | Nothing to look at: the ring is an item, not a block |
+| FTB Quests | Passively | Item id `angelring_pb:angel_ring` stays stable |
+| Patchouli, AE2, Mekanism, config screen | No | Simple mechanic, no blocks, no settings |
+
 ## Status of our mods
 
 | Mod | Standalone | Integrations |
 |---|---|---|
 | [Construction Wand port](https://github.com/peterbax117/ConstructionWand/tree/port/1.21.1) | Tested (CI) | JEI plugin (info pages); item handler capability for containers. Botania removed (no 1.21.1 release). Not yet: Jade, config screen, Sophisticated Backpacks test |
-| [Angel Ring](https://github.com/peterbax117/angelring-pb) | Tested (CI) | Curios ring slot, tested with and without Curios. Not yet: JEI info page, decision on rings inside backpacks |
+| [Angel Ring](https://github.com/peterbax117/angelring-pb) | Tested (CI) | Curios ring slot, JEI info page, CraftTweaker recipe replacement; rings inside containers do not count. All tested (CI matrix: standalone, integrations, crafttweaker) |
