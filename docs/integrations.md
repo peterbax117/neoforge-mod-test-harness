@@ -80,9 +80,16 @@ the exact behavior, and confirm it with the owner before coding. Angel Ring (con
 | FTB Quests | Passively | Item id `angelring_pb:angel_ring` stays stable |
 | Patchouli, AE2, Mekanism, config screen | No | Simple mechanic, no blocks, no settings |
 
+Construction Wand (confirmed 2026-11-01): JEI yes (info pages), Sophisticated Backpacks yes (blocks inside a
+backpack are used, like shulker boxes and bundles), CraftTweaker/KubeJS yes, config screen yes, Jade no (no
+blocks), Curios no (wands are held, not worn).
+
+Sophisticated Backpacks only exposes a backpack's contents through the item handler capability after the backpack
+has been used once (it assigns a contents UUID on first access). Tests must simulate that first use.
+
 ## Status of our mods
 
 | Mod | Standalone | Integrations |
 |---|---|---|
-| [Construction Wand port](https://github.com/peterbax117/ConstructionWand/tree/port/1.21.1) | Tested (CI) | JEI plugin (info pages); item handler capability for containers. Botania removed (no 1.21.1 release). Not yet: Jade, config screen, Sophisticated Backpacks test |
+| [Construction Wand port](https://github.com/peterbax117/ConstructionWand/tree/port/1.21.1) | Tested (CI) | JEI info pages, Sophisticated Backpacks as a block source, CraftTweaker recipe replacement, NeoForge config screen; Jade and Curios do not apply; Botania removed (no 1.21.1 release). CI matrix: standalone, integrations, crafttweaker |
 | [Angel Ring](https://github.com/peterbax117/angelring-pb) | Tested (CI) | Curios ring slot, JEI info page, CraftTweaker recipe replacement; rings inside containers do not count. All tested (CI matrix: standalone, integrations, crafttweaker) |
