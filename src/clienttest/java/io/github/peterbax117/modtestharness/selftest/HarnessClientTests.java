@@ -8,6 +8,7 @@ import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -83,5 +84,26 @@ public class HarnessClientTests
         ctx.giveMainHand(() -> new ItemStack(Items.STONE, 5));
         ctx.giveMainHand(() -> new ItemStack(Items.STONE, 7));
         check(ctx.onClient(() -> ctx.mc().player.getMainHandItem().getCount()) == 7, "Client should hold the second stack");
+    }
+
+    @ClientTest(value = "setGameMode switches mode on both sides", order = 7)
+    public static void gameMode(ClientTestContext ctx) {
+        ctx.setGameMode(GameType.SURVIVAL);
+        check(ctx.onServer(p -> p.gameMode.getGameModeForPlayer()) == GameType.SURVIVAL, "Server should be in survival");
+        check(!ctx.onClient(() -> ctx.mc().player.getAbilities().mayfly), "Survival player should not be able to fly");
+    }
+
+    @ClientTest(value = "runner resets the game mode to creative after a test", order = 8)
+    public static void gameModeReset(ClientTestContext ctx) {
+        check(ctx.onServer(p -> p.gameMode.getGameModeForPlayer()) == GameType.CREATIVE, "Previous test's survival mode should be reset");
+    }
+
+    @ClientTest(value = "perTick runs one step per consecutive client tick", order = 9)
+    public static void perTickIsConsecutive(ClientTestContext ctx) {
+        long[] gameTimes = new long[5];
+        ctx.perTick(5, i -> gameTimes[i] = ctx.mc().level.getGameTime());
+        for(int i = 1; i < gameTimes.length; i++) {
+            check(gameTimes[i] - gameTimes[i - 1] == 1, "Steps should run on consecutive ticks: " + java.util.Arrays.toString(gameTimes));
+        }
     }
 }

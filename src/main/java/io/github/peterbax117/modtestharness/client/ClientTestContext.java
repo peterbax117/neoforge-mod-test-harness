@@ -6,16 +6,20 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.client.ClientHooks;
 import org.lwjgl.glfw.GLFW;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.IntConsumer;
 import java.util.function.Supplier;
 
 /**
@@ -159,6 +163,50 @@ public final class ClientTestContext
         waitTicks(5);
     }
 
+    /**
+     * Runs {@code step} at the start of {@code ticks} consecutive client ticks (step index 0, 1, ...), before
+     * Minecraft reads input for that tick, and waits until all steps ran. Use it for input that depends on exact
+     * timing, such as a double tap: {@code perTick(4, i -> jumpKey.setDown(i % 2 == 0))}.
+     */
+    public void perTick(int ticks, IntConsumer step) {
+        TickScript script = new TickScript(step, ticks);
+        if(!ACTIVE_SCRIPT.compareAndSet(null, script)) throw new IllegalStateException("Another perTick script is running");
+        try {
+            script.done.get(Math.max(30, ticks / 10 + 10), TimeUnit.SECONDS);
+        } catch(Exception e) {
+            throw unwrap("perTick script failed", e);
+        } finally {
+            ACTIVE_SCRIPT.compareAndSet(script, null);
+        }
+    }
+
+    private static final AtomicReference<TickScript> ACTIVE_SCRIPT = new AtomicReference<>();
+
+    private static final class TickScript
+    {
+        final IntConsumer step;
+        final int length;
+        final CompletableFuture<Void> done = new CompletableFuture<>();
+        int next;
+
+        TickScript(IntConsumer step, int length) {
+            this.step = step;
+            this.length = length;
+        }
+    }
+
+    /** Called by the runner at ClientTickEvent.Pre on the client thread. */
+    static void onClientTickPre() {
+        TickScript script = ACTIVE_SCRIPT.get();
+        if(script == null || script.done.isDone()) return;
+        try {
+            if(script.next < script.length) script.step.accept(script.next++);
+            if(script.next >= script.length) script.done.complete(null);
+        } catch(Throwable t) {
+            script.done.completeExceptionally(t);
+        }
+    }
+
     /** Releases every simulated input. The runner calls this after each test. */
     public void releaseAllInput() {
         onClient(() -> {
@@ -172,6 +220,13 @@ public final class ClientTestContext
     }
 
     // World and inventory (server side)
+
+    /** Switches the player's game mode and waits until the client sees it. The runner resets to creative after each test. */
+    public void setGameMode(GameType mode) {
+        onServerDo(p -> p.setGameMode(mode));
+        await("client game mode " + mode, () -> mc.gameMode != null && mc.gameMode.getPlayerMode() == mode);
+        waitTicks(2);
+    }
 
     /**
      * Clears the inventory and puts the stack in hotbar slot 0. Waits for the client to see an empty hand first,

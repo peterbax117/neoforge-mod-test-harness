@@ -59,6 +59,7 @@ public final class ClientTestRunner
 
         Path reportFile = Path.of(report);
         NeoForge.EVENT_BUS.addListener((ClientTickEvent.Post e) -> CLIENT_TICKS.incrementAndGet());
+        NeoForge.EVENT_BUS.addListener((ClientTickEvent.Pre e) -> ClientTestContext.onClientTickPre());
         Thread runner = new Thread(() -> runAll(reportFile), "modtestharness-clienttest");
         runner.setDaemon(true);
         runner.start();
@@ -88,6 +89,7 @@ public final class ClientTestRunner
                 } finally {
                     try {
                         ctx.releaseAllInput();
+                        ctx.setGameMode(GameType.CREATIVE);
                         ctx.waitTicks(5);
                     } catch(Throwable ignored) {
                     }

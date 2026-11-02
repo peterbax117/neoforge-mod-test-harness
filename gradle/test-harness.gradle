@@ -6,7 +6,7 @@
 //   src/clienttest  scripted client tests, run with: gradlew clientTest
 // Neither source set is packaged into the mod jar.
 
-def harnessCoordinates = 'io.github.peterbax117:neoforge-mod-test-harness:0.1.0'
+def harnessCoordinates = 'io.github.peterbax117:neoforge-mod-test-harness:0.2.0'
 def clientTestReport = layout.buildDirectory.file('clienttest/report.txt')
 
 sourceSets {

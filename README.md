@@ -88,11 +88,18 @@ each call, so tests read top to bottom.
 |---|---|
 | Threads | `onClient`, `onServer`, `onServerDo` |
 | Waiting | `await`, `awaitScreen`, `waitTicks`, `check` |
-| Input | `sneak`, `pressKey`, `click`, `clickUse`, `clickAttack`, `scroll`, `look` |
-| World | `giveMainHand`, `teleport`, `fill`, `serverBlock` |
+| Input | `sneak`, `pressKey`, `click`, `clickUse`, `clickAttack`, `scroll`, `look`, `perTick` |
+| World | `giveMainHand`, `teleport`, `fill`, `serverBlock`, `setGameMode` |
 
 Input goes through the game's own paths: key mappings, `KeyboardHandler.keyPress` (fires `InputEvent.Key`) and
-NeoForge's scroll hook. Inputs are released and screens closed after every test.
+NeoForge's scroll hook. After every test the runner releases inputs, closes screens and resets the player to creative.
+
+For input that depends on exact timing, `perTick` runs one step at the start of each of N consecutive client ticks,
+before Minecraft reads input. Example, a double tap of jump to start flying:
+
+```java
+ctx.perTick(4, i -> ctx.mc().options.keyJump.setDown(i % 2 == 0));
+```
 
 The world is creative superflat; the surface is y = -61, so players stand at y = -60.
 
@@ -148,6 +155,11 @@ Add `/harness/` to the mod's `.gitignore`.
 - Wait for state that proves the new fixture arrived. `giveMainHand` waits for an empty hand, then the exact
   new item, so a previous test's identical item cannot satisfy the wait.
 - `GameTestHelper.forEveryBlockInStructure` yields relative positions; read them with `helper.getBlockState`.
+- A GameTest body runs within one server tick. APIs that cache per tick (Curios caches `isEquipped` lookups per
+  game tick) return stale results if state changes in the same tick; make the change in a later tick with
+  `helper.runAfterDelay(1, ...)`, as a player would.
+- Use `perTick` instead of `waitTicks` between key presses when the game checks timing windows; polling can
+  land a tick or two late.
 - When a new test fails, check the mod's documented behavior before changing either the test or the mod.
 
 ## What this cannot do
