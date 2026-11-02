@@ -7,6 +7,9 @@ Automated tests for NeoForge 1.21.1 mods, runnable from the command line and Git
 - **Client tests**: scripted tests inside a real Minecraft client. The harness creates a creative superflat
   world, runs every `@ClientTest`, writes a report and exits. Run with `gradlew clientTest`.
 
+See [docs/integrations.md](docs/integrations.md) for the standalone-first rule, which integrations real 1.21.1 packs
+install (JEI, Curios, Jade, ...), and how to test with and without them.
+
 The harness is a small test-only mod (`modtestharness`). It is loaded only in test runs and never packaged into
 your mod's jar.
 
