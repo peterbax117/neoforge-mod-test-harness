@@ -123,6 +123,11 @@ public class HarnessClientTests
             // The crafting GUI is 176x166 GUI pixels; the default window allows GUI scale 2.
             check(image.getWidth() == 352 && image.getHeight() == 332, "Unexpected screenshot size " + image.getWidth() + "x" + image.getHeight());
         }
+        Path grid = ctx.screenshotCraftingGrid("selftest-crafting_table-grid");
+        try(var in = Files.newInputStream(grid); var image = NativeImage.read(in)) {
+            // 117x55 GUI pixels of grid, arrow and output, plus a 4 pixel margin, at 4 image pixels per GUI pixel.
+            check(image.getWidth() == 500 && image.getHeight() == 252, "Unexpected grid panel size " + image.getWidth() + "x" + image.getHeight());
+        }
         ctx.closeContainer();
         check(ctx.onServer(p -> p.getInventory().items.stream().filter(s -> s.is(ItemTags.PLANKS)).mapToInt(ItemStack::getCount).sum()) == 4,
                 "Closing should return the grid's 4 planks to the player");

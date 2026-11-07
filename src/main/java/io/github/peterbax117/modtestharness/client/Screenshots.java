@@ -74,21 +74,69 @@ final class Screenshots
 
     /** Captures the last rendered frame, crops it to the given window pixel rectangle and writes {@code <name>.png}. */
     static Path save(Minecraft mc, String name, int x, int y, int width, int height) {
-        if(!name.matches("[a-z0-9_.-]+")) throw new IllegalArgumentException("Screenshot name must match [a-z0-9_.-]+: " + name);
-        Path file = directory(mc).resolve(name + ".png");
+        return write(mc, name, crop(mc, x, y, width, height));
+    }
+
+    /**
+     * Captures a GUI region as a wiki style panel: the content rectangle plus {@code padding}, everything outside
+     * the content repainted in the GUI background color (hides titles and neighboring buttons), a beveled border
+     * like a vanilla GUI panel, and an integer nearest-neighbor upscale. Units are window pixels; {@code px} is
+     * the size of one GUI pixel.
+     */
+    static Path savePanel(Minecraft mc, String name, int contentX, int contentY, int contentW, int contentH, int padding, int px, int upscale) {
+        NativeImage panel = crop(mc, contentX - padding, contentY - padding, contentW + 2 * padding, contentH + 2 * padding);
+        int w = panel.getWidth();
+        int h = panel.getHeight();
+        for(int j = 0; j < h; j++) {
+            for(int i = 0; i < w; i++) {
+                boolean content = i >= padding && i < padding + contentW && j >= padding && j < padding + contentH;
+                int edge = Math.min(Math.min(i, j), Math.min(w - 1 - i, h - 1 - j));
+                int color;
+                if(edge < px) color = OUTLINE;
+                else if(edge < 2 * px) color = Math.min(i, j) <= Math.min(w - 1 - i, h - 1 - j) ? HIGHLIGHT : SHADOW;
+                else if(!content) color = BACKGROUND;
+                else continue;
+                panel.setPixelRGBA(i, j, color);
+            }
+        }
+        if(upscale > 1) {
+            NativeImage big = new NativeImage(w * upscale, h * upscale, false);
+            for(int j = 0; j < h * upscale; j++) {
+                for(int i = 0; i < w * upscale; i++) big.setPixelRGBA(i, j, panel.getPixelRGBA(i / upscale, j / upscale));
+            }
+            panel.close();
+            panel = big;
+        }
+        return write(mc, name, panel);
+    }
+
+    // Vanilla GUI panel colors (grey values, so the ABGR byte order does not matter).
+    private static final int OUTLINE = 0xFF000000;
+    private static final int HIGHLIGHT = 0xFFFFFFFF;
+    private static final int SHADOW = 0xFF555555;
+    private static final int BACKGROUND = 0xFFC6C6C6;
+
+    private static NativeImage crop(Minecraft mc, int x, int y, int width, int height) {
         try(NativeImage frame = Screenshot.takeScreenshot(mc.getMainRenderTarget())) {
             int left = Math.max(0, x);
             int top = Math.max(0, y);
             int w = Math.min(width, frame.getWidth() - left);
             int h = Math.min(height, frame.getHeight() - top);
             if(w <= 0 || h <= 0) throw new AssertionError("Crop " + x + "," + y + " " + width + "x" + height + " is outside the window");
-            try(NativeImage out = new NativeImage(w, h, false)) {
-                for(int j = 0; j < h; j++) {
-                    for(int i = 0; i < w; i++) out.setPixelRGBA(i, j, frame.getPixelRGBA(left + i, top + j));
-                }
-                Files.createDirectories(file.getParent());
-                out.writeToFile(file);
+            NativeImage out = new NativeImage(w, h, false);
+            for(int j = 0; j < h; j++) {
+                for(int i = 0; i < w; i++) out.setPixelRGBA(i, j, frame.getPixelRGBA(left + i, top + j));
             }
+            return out;
+        }
+    }
+
+    private static Path write(Minecraft mc, String name, NativeImage image) {
+        if(!name.matches("[a-z0-9_.-]+")) throw new IllegalArgumentException("Screenshot name must match [a-z0-9_.-]+: " + name);
+        Path file = directory(mc).resolve(name + ".png");
+        try(image) {
+            Files.createDirectories(file.getParent());
+            image.writeToFile(file);
         } catch(IOException e) {
             throw new UncheckedIOException("Could not write screenshot " + file, e);
         }
