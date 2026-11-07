@@ -1,11 +1,14 @@
 package io.github.peterbax117.modtestharness.selftest;
 
+import com.mojang.blaze3d.platform.NativeImage;
 import io.github.peterbax117.modtestharness.client.ClientTest;
 import io.github.peterbax117.modtestharness.client.ClientTestContext;
 import io.github.peterbax117.modtestharness.client.ClientTestHolder;
 import io.github.peterbax117.modtestharness.client.SimulatedKeys;
 import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.ItemTags;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameType;
@@ -15,6 +18,9 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.InputEvent;
 import org.lwjgl.glfw.GLFW;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static io.github.peterbax117.modtestharness.client.ClientTestContext.check;
 
@@ -105,5 +111,20 @@ public class HarnessClientTests
         for(int i = 1; i < gameTimes.length; i++) {
             check(gameTimes[i] - gameTimes[i - 1] == 1, "Steps should run on consecutive ticks: " + java.util.Arrays.toString(gameTimes));
         }
+    }
+
+    @ClientTest(value = "showCraftingRecipe and screenshotContainer save the crafting GUI", order = 10)
+    public static void recipeScreenshot(ClientTestContext ctx) throws java.io.IOException {
+        ItemStack result = ctx.showCraftingRecipe(ResourceLocation.withDefaultNamespace("crafting_table"));
+        check(result.is(Items.CRAFTING_TABLE), "Recipe result should be a crafting table, got " + result);
+
+        Path file = ctx.screenshotContainer("selftest-crafting_table");
+        try(var in = Files.newInputStream(file); var image = NativeImage.read(in)) {
+            // The crafting GUI is 176x166 GUI pixels; the default window allows GUI scale 2.
+            check(image.getWidth() == 352 && image.getHeight() == 332, "Unexpected screenshot size " + image.getWidth() + "x" + image.getHeight());
+        }
+        ctx.closeContainer();
+        check(ctx.onServer(p -> p.getInventory().items.stream().filter(s -> s.is(ItemTags.PLANKS)).mapToInt(ItemStack::getCount).sum()) == 4,
+                "Closing should return the grid's 4 planks to the player");
     }
 }

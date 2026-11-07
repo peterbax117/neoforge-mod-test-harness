@@ -3,14 +3,24 @@ package io.github.peterbax117.modtestharness.client;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.gui.screens.inventory.CraftingScreen;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.SimpleMenuProvider;
+import net.minecraft.world.inventory.ContainerLevelAccess;
+import net.minecraft.world.inventory.CraftingMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.client.ClientHooks;
 import org.lwjgl.glfw.GLFW;
 
+import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -215,7 +225,8 @@ public final class ClientTestContext
                 SimulatedKeys.set(key, false);
                 mc.keyboardHandler.keyPress(mc.getWindow().getWindow(), key, 0, GLFW.GLFW_RELEASE, 0);
             }
-            if(mc.screen != null) mc.setScreen(null);
+            if(mc.screen instanceof AbstractContainerScreen<?>) mc.player.closeContainer();
+            else if(mc.screen != null) mc.setScreen(null);
         });
     }
 
@@ -263,6 +274,99 @@ public final class ClientTestContext
 
     public BlockState serverBlock(BlockPos pos) {
         return onServer(p -> p.serverLevel().getBlockState(pos));
+    }
+
+    // Recipes and screenshots
+
+    /**
+     * Opens a real crafting table screen showing a crafting recipe: its ingredients in the grid (tag ingredients
+     * use their first vanilla item) and the result the game computes in the output slot. Fails if the game does
+     * not produce the recipe's result. Returns the result. Close the screen with {@link #closeContainer()}.
+     */
+    public ItemStack showCraftingRecipe(ResourceLocation recipeId) {
+        Screenshots.RecipeGrid grid = onServer(p -> Screenshots.RecipeGrid.of(p, recipeId));
+        showCrafting(grid.slots(), grid.result());
+        return grid.result();
+    }
+
+    /**
+     * Opens a crafting table screen with nine grid stacks (row by row, {@code ItemStack.EMPTY} for gaps) and waits
+     * until the client shows the expected result in the output slot. Clears the player's inventory first and
+     * places the table under the player.
+     */
+    public void showCrafting(List<ItemStack> grid, ItemStack expectedResult) {
+        if(grid.size() != 9) throw new IllegalArgumentException("A crafting grid has 9 slots, got " + grid.size());
+        onServerDo(p -> {
+            // An empty inventory keeps leftovers from earlier tests out of the screenshot.
+            p.getInventory().clearContent();
+            BlockPos table = p.blockPosition().below(2);
+            p.serverLevel().setBlockAndUpdate(table, Blocks.CRAFTING_TABLE.defaultBlockState());
+            p.openMenu(new SimpleMenuProvider((id, inventory, player) -> new CraftingMenu(id, inventory,
+                    ContainerLevelAccess.create(p.serverLevel(), table)), Component.translatable("container.crafting")));
+            for(int i = 0; i < 9; i++) p.containerMenu.getSlot(i + 1).set(grid.get(i).copy());
+            p.containerMenu.broadcastChanges();
+        });
+        awaitScreen(CraftingScreen.class);
+        await("crafting output " + expectedResult, () -> mc.player.containerMenu instanceof CraftingMenu menu
+                && ItemStack.isSameItemSameComponents(menu.getSlot(0).getItem(), expectedResult)
+                && menu.getSlot(0).getItem().getCount() == expectedResult.getCount());
+        waitTicks(5);
+    }
+
+    /** Closes the open container screen the way a player does, so the server closes the menu too. */
+    public void closeContainer() {
+        onClient(() -> mc.player.closeContainer());
+        await("server to close the menu", () -> onServer(p -> p.containerMenu == p.inventoryMenu));
+    }
+
+    /**
+     * Saves the open container screen (crafting table, furnace, your mod's GUI) as a PNG cropped to the GUI, at
+     * GUI scale 2. Files go to {@code build/screenshots/<name>.png}. Returns the file.
+     */
+    public Path screenshotContainer(String name) {
+        return screenshotContainer(name, 2);
+    }
+
+    /** As {@link #screenshotContainer(String)}, at a GUI scale clamped to what the window allows. */
+    public Path screenshotContainer(String name, int guiScale) {
+        return withGuiScale(guiScale, () -> onClient(() -> {
+            if(!(mc.screen instanceof AbstractContainerScreen<?> screen)) {
+                throw new AssertionError("No container screen open, screen is " + mc.screen);
+            }
+            double scale = mc.getWindow().getGuiScale();
+            return Screenshots.save(mc, name, (int) Math.round(screen.getGuiLeft() * scale), (int) Math.round(screen.getGuiTop() * scale),
+                    (int) Math.round(screen.getXSize() * scale), (int) Math.round(screen.getYSize() * scale));
+        }));
+    }
+
+    /** Saves the whole window as a PNG to {@code build/screenshots/<name>.png}. Returns the file. */
+    public Path screenshot(String name) {
+        onClient(() -> {
+            Screenshots.parkMouse(mc);
+            mc.getToasts().clear();
+        });
+        waitTicks(3);
+        return onClient(() -> Screenshots.save(mc, name, 0, 0, mc.getWindow().getWidth(), mc.getWindow().getHeight()));
+    }
+
+    // Applies a GUI scale, lets a few frames render, runs the capture, then restores the player's setting.
+    private <T> T withGuiScale(int guiScale, Supplier<T> capture) {
+        int previous = onClient(() -> mc.options.guiScale().get());
+        try {
+            onClient(() -> {
+                mc.options.guiScale().set(mc.getWindow().calculateScale(guiScale, mc.isEnforceUnicode()));
+                mc.resizeDisplay();
+                Screenshots.parkMouse(mc);
+                mc.getToasts().clear();
+            });
+            waitTicks(5);
+            return capture.get();
+        } finally {
+            onClient(() -> {
+                mc.options.guiScale().set(previous);
+                mc.resizeDisplay();
+            });
+        }
     }
 
     // Rethrows assertion failures from the client or server thread as-is, so the report shows the real message.

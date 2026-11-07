@@ -47,6 +47,7 @@ neoForge {
             sourceSet = sourceSets.clienttest
             gameDirectory = project.file('run/clienttest')
             systemProperty 'modtestharness.clienttest.report', clientTestReport.get().asFile.absolutePath
+            systemProperty 'modtestharness.screenshots.dir', layout.buildDirectory.dir('screenshots').get().asFile.absolutePath
         }
 
         configureEach {
