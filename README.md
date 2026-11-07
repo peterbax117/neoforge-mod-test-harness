@@ -93,7 +93,7 @@ each call, so tests read top to bottom.
 | Waiting | `await`, `awaitScreen`, `waitTicks`, `check` |
 | Input | `sneak`, `pressKey`, `click`, `clickUse`, `clickAttack`, `scroll`, `look`, `perTick` |
 | World | `giveMainHand`, `teleport`, `fill`, `serverBlock`, `setGameMode` |
-| Recipes and screenshots | `showCraftingRecipe`, `showCrafting`, `closeContainer`, `screenshotContainer`, `screenshot` |
+| Recipes and screenshots | `showCraftingRecipe`, `showCrafting`, `closeContainer`, `screenshotCraftingGrid`, `screenshotPanel`, `screenshotContainer`, `screenshot` |
 
 Input goes through the game's own paths: key mappings, `KeyboardHandler.keyPress` (fires `InputEvent.Key`) and
 NeoForge's scroll hook. After every test the runner releases inputs, closes screens and resets the player to creative.
@@ -117,7 +117,7 @@ always match the current recipe and textures, and the test fails if the recipe s
 public static void recipeScreenshot(ClientTestContext ctx) {
     ItemStack result = ctx.showCraftingRecipe(ResourceLocation.fromNamespaceAndPath(MODID, "angel_ring"));
     check(result.is(MyMod.ANGEL_RING.get()), "Recipe should craft the ring, got " + result);
-    ctx.screenshotContainer("recipe-angel_ring");
+    ctx.screenshotCraftingGrid("recipe-angel_ring");
     ctx.closeContainer();
 }
 ```
@@ -126,11 +126,12 @@ public static void recipeScreenshot(ClientTestContext ctx) {
   inventory is cleared), lays the recipe's ingredients on the grid and waits for the game to compute the result.
   Tag ingredients show their first vanilla item, so the image is the same with or without other mods installed.
   `showCrafting(grid, expected)` takes nine explicit stacks instead.
-- `screenshotContainer(name)` saves the open container GUI, cropped to the GUI, at GUI scale 2 (352x332 for a
-  crafting table) to `build/screenshots/<name>.png`. Toasts are cleared and the mouse is parked so no tooltip
-  shows. `screenshotContainer(name, scale)` picks another scale, clamped to what the window allows (the default
-  854x480 client window allows 2). Works for any `AbstractContainerScreen`, including your mod's own GUIs.
-- `screenshot(name)` saves the whole window.
+- `screenshotCraftingGrid(name)` saves only the grid, arrow and output slot as a panel like the Minecraft Wiki's
+  recipe images: the GUI background, a beveled vanilla border, 4 image pixels per GUI pixel (500x252), written to
+  `build/screenshots/<name>.png`. Toasts are cleared and the mouse is parked so no tooltip shows.
+- `screenshotPanel(name, x, y, width, height)` does the same for any region of any `AbstractContainerScreen`
+  (GUI pixels from the GUI's top left), for example a furnace, a smithing table or your mod's own GUI.
+- `screenshotContainer(name)` saves the whole container GUI; `screenshot(name)` saves the whole window.
 - `closeContainer()` closes the screen the way a player does; the grid's items return to the inventory.
 
 In CI, upload `build/screenshots/` as an artifact from the standalone setup so the images match what every player
