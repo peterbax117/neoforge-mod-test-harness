@@ -93,6 +93,7 @@ each call, so tests read top to bottom.
 | Waiting | `await`, `awaitScreen`, `waitTicks`, `check` |
 | Input | `sneak`, `pressKey`, `click`, `clickUse`, `clickAttack`, `scroll`, `look`, `perTick` |
 | World | `giveMainHand`, `teleport`, `fill`, `serverBlock`, `setGameMode` |
+| Recipes and screenshots | `showCraftingRecipe`, `showCrafting`, `closeContainer`, `screenshotContainer`, `screenshot` |
 
 Input goes through the game's own paths: key mappings, `KeyboardHandler.keyPress` (fires `InputEvent.Key`) and
 NeoForge's scroll hook. After every test the runner releases inputs, closes screens and resets the player to creative.
@@ -105,6 +106,35 @@ ctx.perTick(4, i -> ctx.mc().options.keyJump.setDown(i % 2 == 0));
 ```
 
 The world is creative superflat; the surface is y = -61, so players stand at y = -60.
+
+### Recipe and GUI screenshots
+
+Listing pages (CurseForge, Modrinth) need recipe images. A client test produces them from the real game, so they
+always match the current recipe and textures, and the test fails if the recipe stops working:
+
+```java
+@ClientTest(value = "crafting table crafts the ring (saves recipe-angel_ring.png)", order = 5)
+public static void recipeScreenshot(ClientTestContext ctx) {
+    ItemStack result = ctx.showCraftingRecipe(ResourceLocation.fromNamespaceAndPath(MODID, "angel_ring"));
+    check(result.is(MyMod.ANGEL_RING.get()), "Recipe should craft the ring, got " + result);
+    ctx.screenshotContainer("recipe-angel_ring");
+    ctx.closeContainer();
+}
+```
+
+- `showCraftingRecipe(id)` opens a real crafting table screen (the table is placed under the player and the
+  inventory is cleared), lays the recipe's ingredients on the grid and waits for the game to compute the result.
+  Tag ingredients show their first vanilla item, so the image is the same with or without other mods installed.
+  `showCrafting(grid, expected)` takes nine explicit stacks instead.
+- `screenshotContainer(name)` saves the open container GUI, cropped to the GUI, at GUI scale 2 (352x332 for a
+  crafting table) to `build/screenshots/<name>.png`. Toasts are cleared and the mouse is parked so no tooltip
+  shows. `screenshotContainer(name, scale)` picks another scale, clamped to what the window allows (the default
+  854x480 client window allows 2). Works for any `AbstractContainerScreen`, including your mod's own GUIs.
+- `screenshot(name)` saves the whole window.
+- `closeContainer()` closes the screen the way a player does; the grid's items return to the inventory.
+
+In CI, upload `build/screenshots/` as an artifact from the standalone setup so the images match what every player
+sees.
 
 ### Mods that poll the physical key state
 
@@ -148,6 +178,10 @@ steps:
   - run: ./gradlew runGameTestServer
   - run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
   - run: xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew clientTest
+  - uses: actions/upload-artifact@v7
+    with:
+      name: screenshots
+      path: build/screenshots/
 ```
 
 Add `/harness/` to the mod's `.gitignore`.
@@ -168,7 +202,7 @@ Add `/harness/` to the mod's `.gitignore`.
 ## What this cannot do
 
 - Pixel-level rendering comparison. Check render inputs (computed preview positions, tint colors, model
-  properties) instead.
+  properties) instead. Screenshots are for listing pages, not assertions.
 - Protocol bots (Mineflayer and AI agents built on it) cannot join a NeoForge server with required payloads,
   and never run your mod's client code.
 

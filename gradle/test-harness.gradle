@@ -3,11 +3,12 @@
 //
 // Adds:
 //   src/gametest    GameTests, run headless with: gradlew runGameTestServer
-//   src/clienttest  scripted client tests, run with: gradlew clientTest
+//   src/clienttest  scripted client tests, run with: gradlew clientTest (screenshots go to build/screenshots)
 // Neither source set is packaged into the mod jar.
 
-def harnessCoordinates = 'io.github.peterbax117:neoforge-mod-test-harness:0.2.0'
+def harnessCoordinates = 'io.github.peterbax117:neoforge-mod-test-harness:0.3.0'
 def clientTestReport = layout.buildDirectory.file('clienttest/report.txt')
+def screenshotsDir = layout.buildDirectory.dir('screenshots')
 
 sourceSets {
     gametest {
@@ -48,6 +49,7 @@ neoForge.runs {
         sourceSet = sourceSets.clienttest
         gameDirectory = project.file('run/clienttest')
         systemProperty 'modtestharness.clienttest.report', clientTestReport.get().asFile.absolutePath
+        systemProperty 'modtestharness.screenshots.dir', screenshotsDir.get().asFile.absolutePath
     }
 }
 
