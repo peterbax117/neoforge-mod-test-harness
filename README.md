@@ -127,8 +127,11 @@ public static void recipeScreenshot(ClientTestContext ctx) {
   Tag ingredients show their first vanilla item, so the image is the same with or without other mods installed.
   `showCrafting(grid, expected)` takes nine explicit stacks instead.
 - `screenshotCraftingGrid(name)` saves only the grid, arrow and output slot as a panel like the Minecraft Wiki's
-  recipe images: the GUI background, a beveled vanilla border, 4 image pixels per GUI pixel (500x252), written to
+  recipe images: the GUI background, a beveled vanilla border, 8 image pixels per GUI pixel (1000x504), written to
   `build/screenshots/<name>.png`. Toasts are cleared and the mouse is parked so no tooltip shows.
+- Embed panels at half their pixel width, for example `<img src="..." width="500">`. That is 1:1 on 2x (HiDPI)
+  displays and an exact 2:1 reduction on 1x displays, so pixel art stays sharp on both. CurseForge's description
+  column is 836 CSS px wide and keeps `width` attributes; popular mods show recipe images 250 to 640 px wide.
 - `screenshotPanel(name, x, y, width, height)` does the same for any region of any `AbstractContainerScreen`
   (GUI pixels from the GUI's top left), for example a furnace, a smithing table or your mod's own GUI.
 - `screenshotContainer(name)` saves the whole container GUI; `screenshot(name)` saves the whole window.
