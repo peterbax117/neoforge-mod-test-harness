@@ -16,6 +16,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.InputEvent;
 import org.lwjgl.glfw.GLFW;
 
@@ -30,13 +31,19 @@ public class HarnessClientTests
 {
     private static final BlockPos STAND = new BlockPos(0, -60, 0);
     private static volatile double lastScroll;
+    private static volatile long clientTicks;
 
     @EventBusSubscriber(modid = "modtestharness", value = Dist.CLIENT)
-    public static final class ScrollRecorder
+    public static final class EventRecorder
     {
         @SubscribeEvent
         public static void onScroll(InputEvent.MouseScrollingEvent event) {
             lastScroll = event.getScrollDeltaY();
+        }
+
+        @SubscribeEvent
+        public static void onClientTick(ClientTickEvent.Post event) {
+            clientTicks++;
         }
     }
 
@@ -106,10 +113,11 @@ public class HarnessClientTests
 
     @ClientTest(value = "perTick runs one step per consecutive client tick", order = 9)
     public static void perTickIsConsecutive(ClientTestContext ctx) {
-        long[] gameTimes = new long[5];
-        ctx.perTick(5, i -> gameTimes[i] = ctx.mc().level.getGameTime());
-        for(int i = 1; i < gameTimes.length; i++) {
-            check(gameTimes[i] - gameTimes[i - 1] == 1, "Steps should run on consecutive ticks: " + java.util.Arrays.toString(gameTimes));
+        // Counts client ticks directly: the client's game time is resynced from the server and can repeat a value.
+        long[] ticks = new long[5];
+        ctx.perTick(5, i -> ticks[i] = clientTicks);
+        for(int i = 1; i < ticks.length; i++) {
+            check(ticks[i] - ticks[i - 1] == 1, "Steps should run on consecutive client ticks: " + java.util.Arrays.toString(ticks));
         }
     }
 
