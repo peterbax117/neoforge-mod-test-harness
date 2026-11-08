@@ -125,8 +125,8 @@ public class HarnessClientTests
         }
         Path grid = ctx.screenshotCraftingGrid("selftest-crafting_table-grid");
         try(var in = Files.newInputStream(grid); var image = NativeImage.read(in)) {
-            // 117x55 GUI pixels of grid, arrow and output, plus a 4 pixel margin, at 4 image pixels per GUI pixel.
-            check(image.getWidth() == 500 && image.getHeight() == 252, "Unexpected grid panel size " + image.getWidth() + "x" + image.getHeight());
+            // 117x55 GUI pixels of grid, arrow and output, plus a 4 pixel margin, at 8 image pixels per GUI pixel.
+            check(image.getWidth() == 1000 && image.getHeight() == 504, "Unexpected grid panel size " + image.getWidth() + "x" + image.getHeight());
         }
         ctx.closeContainer();
         check(ctx.onServer(p -> p.getInventory().items.stream().filter(s -> s.is(ItemTags.PLANKS)).mapToInt(ItemStack::getCount).sum()) == 4,

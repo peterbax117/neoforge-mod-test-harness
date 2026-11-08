@@ -341,7 +341,7 @@ public final class ClientTestContext
 
     /**
      * Saves just the crafting grid, arrow and output slot of the open crafting table screen as a wiki style panel
-     * (see {@link #screenshotPanel}), at 4 image pixels per GUI pixel. Returns the file.
+     * (see {@link #screenshotPanel}), 1000x504 pixels. Embed it at {@code width="500"}. Returns the file.
      */
     public Path screenshotCraftingGrid(String name) {
         await("crafting table screen", () -> mc.screen instanceof CraftingScreen);
@@ -352,7 +352,8 @@ public final class ClientTestContext
     /**
      * Saves a region of the open container GUI as a wiki style panel: the region (GUI pixels, relative to the GUI's
      * top left corner) with a small margin, everything outside the region repainted in the GUI background color,
-     * and a beveled vanilla panel border. Captured at GUI scale 2 and upscaled to 4 image pixels per GUI pixel.
+     * and a beveled vanilla panel border. Captured at GUI scale 2 and upscaled to 8 image pixels per GUI pixel, so
+     * embedding it at half width (for example {@code width="500"} for the crafting grid) is sharp on 2x displays.
      */
     public Path screenshotPanel(String name, int x, int y, int width, int height) {
         return withGuiScale(2, () -> onClient(() -> {
@@ -361,7 +362,7 @@ public final class ClientTestContext
             }
             int px = (int) Math.round(mc.getWindow().getGuiScale());
             return Screenshots.savePanel(mc, name, (screen.getGuiLeft() + x) * px, (screen.getGuiTop() + y) * px,
-                    width * px, height * px, 4 * px, px, Math.max(1, 4 / px));
+                    width * px, height * px, 4 * px, px, Math.max(1, 8 / px));
         }));
     }
 
